@@ -1,0 +1,64 @@
+{% extends "sketches/_layout.html" %}
+{% block body %}
+  <p>prompt → ChatGPT/template → OpenSCAD → exportable bridge/component model. signal steady.</p>
+  <form method="post">
+    {% csrf_token %}
+    <p>
+      <label for="{{ form.prompt.id_for_label }}">freeform prompt</label><br>
+      {{ form.prompt }}
+    </p>
+
+    <fieldset>
+      <legend>structured bridge request</legend>
+      <div class="row" style="gap:12px;flex-wrap:wrap;">
+        <div>{{ form.bridge_type.label_tag }}<br>{{ form.bridge_type }}</div>
+        <div>{{ form.material.label_tag }}<br>{{ form.material }}</div>
+        <div>{{ form.lane_count.label_tag }}<br>{{ form.lane_count }}</div>
+      </div>
+      <div class="row" style="gap:12px;flex-wrap:wrap; margin-top: 10px;">
+        <div>{{ form.span_mm.label_tag }}<br>{{ form.span_mm }}</div>
+        <div>{{ form.deck_width_mm.label_tag }}<br>{{ form.deck_width_mm }}</div>
+        <div>{{ form.clearance_mm.label_tag }}<br>{{ form.clearance_mm }}</div>
+        <div>{{ form.max_height_mm.label_tag }}<br>{{ form.max_height_mm }}</div>
+      </div>
+      <div style="margin-top: 10px;">
+        <div>{{ form.features.label }}</div>
+        {{ form.features }}
+      </div>
+      <p style="margin-top: 10px;">
+        {{ form.notes.label_tag }}<br>
+        {{ form.notes }}
+      </p>
+      <div class="row" style="gap:16px;">
+        <label>{{ form.export_png }} {{ form.export_png.label }}</label>
+        <label>{{ form.export_stl }} {{ form.export_stl.label }}</label>
+      </div>
+    </fieldset>
+
+    {% if form.non_field_errors %}
+      <pre class="err">{% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}\n{% endif %}{% endfor %}</pre>
+    {% endif %}
+    <p><button type="submit">forge</button></p>
+  </form>
+
+  <p class="examples">
+    try:
+    <code>120mm arched stone bridge with railings</code> ·
+    <code>printable truss bridge for a civil engineer</code> ·
+    <code>suspension bridge with towers and cables</code>
+  </p>
+  <p class="examples">or leave the prompt short and fill in the structured bridge request with exact dimensions.</p>
+
+  {% if recent %}
+    <h2>recent</h2>
+    <div class="row">
+      {% for s in recent %}
+        <a class="card" href="{% url 'sketches:show' s.pk %}">
+          {% if s.preview %}<img class="preview" src="{{ s.preview.url }}">{% endif %}
+          <div>#{{ s.pk }} <span class="tag">{{ s.kind }}</span> <span class="tag">{{ s.status }}</span></div>
+          <div>{{ s.prompt|truncatechars:60 }}</div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

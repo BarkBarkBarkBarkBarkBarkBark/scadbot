@@ -1,0 +1,26 @@
+{% extends "sketches/_layout.html" %}
+{% block title %}component library{% endblock %}
+{% block body %}
+<h2>component library</h2>
+<p class="examples">{{ components|length }} done component{{ components|length|pluralize }}. click any to view or revise, or <a href="{% url 'sketches:assemble' %}">compose an assembly →</a></p>
+<div class="row">
+  {% for c in components %}
+    <a class="card" href="{% url 'sketches:show' c.pk %}">
+      {% if c.preview %}<img class="preview" src="{{ c.preview.url }}" style="max-height:160px;width:100%;object-fit:cover;">{% endif %}
+      <div style="margin-top:.4rem">
+        <strong>{{ c.module_name|default:"unnamed" }}</strong>
+        <span class="tag">#{{ c.pk }}</span>
+        {% if c.category %}<span class="tag">{{ c.category }}</span>{% endif %}
+      </div>
+      <div class="examples" style="font-size:.8rem;margin-top:.2rem">{{ c.prompt|truncatechars:60 }}</div>
+      {% if c.interface_json.params %}
+        <div style="font-size:.75rem;color:#7ec3ff;margin-top:.3rem">
+          params: {% for p in c.interface_json.params %}{{ p.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </div>
+      {% endif %}
+    </a>
+  {% empty %}
+    <p>No components yet. <a href="{% url 'sketches:compose' %}">generate one →</a></p>
+  {% endfor %}
+</div>
+{% endblock %}

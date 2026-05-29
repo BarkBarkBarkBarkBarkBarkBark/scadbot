@@ -1,0 +1,57 @@
+{% extends "sketches/_layout.html" %}
+{% block title %}assembly #{{ assembly.pk }}{% endblock %}
+{% block body %}
+  {% if in_progress %}<meta http-equiv="refresh" content="2">{% endif %}
+  <p><a href="{% url 'sketches:edit_assembly' assembly.pk %}">← edit assembly</a></p>
+  <h2>assembly #{{ assembly.pk }} <span class="tag">{{ assembly.status }}</span></h2>
+  <p><em>{{ assembly.prompt }}</em></p>
+
+  {% if in_progress %}
+    <p class="examples">rendering… refreshing every 2 s.</p>
+  {% endif %}
+
+  {% if assembly.preview %}
+    <img class="preview" src="{{ assembly.preview.url }}?v={{ assembly.status }}" alt="assembly render">
+  {% elif in_progress %}
+    <div class="preview" style="aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;color:#7ec3ff;">
+      rendering preview…
+    </div>
+  {% endif %}
+
+  {% if assembly.mesh %}
+    <p><a href="{{ assembly.mesh.url }}" download>download .stl</a></p>
+  {% endif %}
+
+  <h3>composition ({{ refs|length }} part{{ refs|length|pluralize }})</h3>
+  <table style="width:100%;border-collapse:collapse">
+    <tr style="color:#aeb6c2;font-size:.8rem">
+      <th style="text-align:left;padding:.3rem .5rem">#</th>
+      <th style="text-align:left;padding:.3rem .5rem">module</th>
+      <th style="text-align:left;padding:.3rem .5rem">translate</th>
+      <th style="text-align:left;padding:.3rem .5rem">rotate</th>
+    </tr>
+    {% for ref in refs %}
+    <tr style="border-top:1px solid #2a2d34">
+      <td style="padding:.3rem .5rem;color:#aeb6c2">{{ forloop.counter }}</td>
+      <td style="padding:.3rem .5rem"><a href="{% url 'sketches:show' ref.component.pk %}" target="_blank">{{ ref.instance_name|default:ref.component.module_name }}</a></td>
+      <td style="padding:.3rem .5rem;font-size:.85rem">{{ ref.translate|join:", " }}</td>
+      <td style="padding:.3rem .5rem;font-size:.85rem">{{ ref.rotate|join:", " }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% if assembly.stage_log %}
+    <h3>progress</h3>
+    <pre>{{ assembly.stage_log }}</pre>
+  {% endif %}
+
+  {% if assembly.error %}
+    <h3>error</h3>
+    <pre class="err">{{ assembly.error }}</pre>
+  {% endif %}
+
+  {% if assembly.scad_source %}
+    <h3>wrapper scad</h3>
+    <pre>{{ assembly.scad_source }}</pre>
+  {% endif %}
+{% endblock %}

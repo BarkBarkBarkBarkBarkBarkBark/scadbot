@@ -1,0 +1,24 @@
+{% extends "sketches/_layout.html" %}
+{% block title %}new assembly{% endblock %}
+{% block body %}
+<h2>new assembly</h2>
+<p class="examples">describe what the scene should contain. components will be picked from the library and placed manually.</p>
+<form method="post">{% csrf_token %}
+  <textarea name="prompt" rows="3" placeholder="e.g. a civic plaza with a bench, a lamppost, and an oak tree" required></textarea>
+  <p><button type="submit">create assembly</button></p>
+</form>
+{% if components %}
+<h3>available components</h3>
+<div class="row">
+  {% for c in components %}
+    <a class="card" href="{% url 'sketches:show' c.pk %}" target="_blank" style="text-decoration:none">
+      {% if c.preview %}<img class="preview" src="{{ c.preview.url }}" style="max-height:120px;width:100%;object-fit:cover;">{% endif %}
+      <div><strong>{{ c.module_name|default:"unnamed" }}</strong> <span class="tag">#{{ c.pk }}</span></div>
+      <div class="examples" style="font-size:.8rem">{{ c.prompt|truncatechars:50 }}</div>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+  <p class="examples">no components yet — <a href="{% url 'sketches:compose' %}">generate some first →</a></p>
+{% endif %}
+{% endblock %}

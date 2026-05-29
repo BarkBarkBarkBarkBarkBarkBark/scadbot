@@ -1,0 +1,136 @@
+{% extends "sketches/_layout.html" %}
+{% block title %}database explorer{% endblock %}
+{% block body %}
+  <h2>database explorer</h2>
+  <p class="examples">dead simple, sticky, and read-only. inspect sketches, standards, chunks, and vector state without leaving the app.</p>
+
+  <div class="row">
+    <div class="card"><strong>{{ summary.sketches }}</strong><br><span class="muted">sketches</span></div>
+    <div class="card"><strong>{{ summary.components }}</strong><br><span class="muted">components</span></div>
+    <div class="card"><strong>{{ summary.assemblies }}</strong><br><span class="muted">assemblies</span></div>
+    <div class="card"><strong>{{ summary.standards }}</strong><br><span class="muted">standards</span></div>
+    <div class="card"><strong>{{ summary.chunks }}</strong><br><span class="muted">chunks</span></div>
+    <div class="card"><strong>{{ summary.vector_rows }}</strong><br><span class="muted">pgvector rows{% if not summary.using_pgvector %} (inactive){% endif %}</span></div>
+  </div>
+
+  <div class="sticky-panel">
+    <form method="get" class="card">
+      <div class="navline" style="margin-top:0;">
+        <a class="navpill" href="?tab=sketches{% if query %}&q={{ query|urlencode }}{% endif %}&limit={{ limit }}">sketches</a>
+        <a class="navpill" href="?tab=standards{% if query %}&q={{ query|urlencode }}{% endif %}&limit={{ limit }}">standards</a>
+        <a class="navpill" href="?tab=chunks{% if query %}&q={{ query|urlencode }}{% endif %}&limit={{ limit }}">chunks</a>
+        <span class="tag">active: {{ active_tab }}</span>
+        {% if summary.using_pgvector %}<span class="tag">pgvector on</span>{% else %}<span class="tag">pgvector off</span>{% endif %}
+      </div>
+      <div class="row" style="margin-top:.8rem;align-items:end;">
+        <div style="flex:1 1 320px;">
+          <label for="q">search</label><br>
+          <input id="q" type="text" name="q" value="{{ query }}" placeholder="prompt, title, section, chunk text…" style="width:100%;">
+        </div>
+        <div>
+          <label for="tab">tab</label><br>
+          <select id="tab" name="tab">
+            <option value="sketches"{% if active_tab == 'sketches' %} selected{% endif %}>sketches</option>
+            <option value="standards"{% if active_tab == 'standards' %} selected{% endif %}>standards</option>
+            <option value="chunks"{% if active_tab == 'chunks' %} selected{% endif %}>chunks</option>
+          </select>
+        </div>
+        <div>
+          <label for="limit">limit</label><br>
+          <input id="limit" type="number" name="limit" value="{{ limit }}" min="10" max="200" step="10">
+        </div>
+        <div>
+          <button type="submit">inspect</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if active_tab == "sketches" %}
+    <table>
+      <thead>
+        <tr>
+          <th>id</th>
+          <th>kind</th>
+          <th>status</th>
+          <th>created</th>
+          <th>prompt</th>
+          <th>exports</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in sketch_rows %}
+          <tr>
+            <td><a href="{% url 'sketches:show' row.pk %}">#{{ row.pk }}</a></td>
+            <td><span class="tag">{{ row.kind }}</span></td>
+            <td><span class="tag">{{ row.status }}</span></td>
+            <td>{{ row.created|date:"Y-m-d H:i" }}</td>
+            <td>
+              <div>{{ row.prompt|truncatechars:140 }}</div>
+              {% if row.module_name %}<div class="muted">module: {{ row.module_name }}</div>{% endif %}
+            </td>
+            <td>{% if row.export_formats %}{{ row.export_formats|join:", " }}{% else %}png, stl{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="muted">no sketches found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% elif active_tab == "standards" %}
+    <table>
+      <thead>
+        <tr>
+          <th>title</th>
+          <th>category</th>
+          <th>status</th>
+          <th>pages</th>
+          <th>chunks</th>
+          <th>source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in standard_rows %}
+          <tr>
+            <td>
+              <div><strong>{{ row.title }}</strong></div>
+              <div class="muted">{{ row.section_id|default:"no section id" }}</div>
+            </td>
+            <td>{{ row.category|default:"General" }}</td>
+            <td><span class="tag">{{ row.status }}</span></td>
+            <td>{{ row.page_count }}</td>
+            <td>{{ row.chunk_total }}</td>
+            <td><a href="{{ row.source_url }}" target="_blank" rel="noreferrer">open</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="muted">no standards found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>chunk</th>
+          <th>standard</th>
+          <th>embedding</th>
+          <th>excerpt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in chunk_rows %}
+          <tr>
+            <td>#{{ row.pk }}<br><span class="muted">{{ row.char_count }} chars</span></td>
+            <td>
+              <div><strong>{{ row.standard.title }}</strong></div>
+              <div class="muted">{{ row.standard.category|default:"General" }} · idx {{ row.chunk_index }}</div>
+            </td>
+            <td>{% if row.embedding_model %}<span class="tag">{{ row.embedding_model }}</span>{% else %}<span class="muted">none</span>{% endif %}</td>
+            <td><pre style="margin:0; white-space:pre-wrap;">{{ row.text|truncatechars:700 }}</pre></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="muted">no chunks found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "sketches/_layout.html" %}
+{% block title %}assembly #{{ assembly.pk }}{% endblock %}
+{% block body %}
+<p><a href="{% url 'sketches:library' %}">← library</a></p>
+<h2>assembly #{{ assembly.pk }} <span class="tag">{{ assembly.status }}</span></h2>
+<p><em>{{ assembly.prompt }}</em></p>
+
+{% if error %}<p class="err">{{ error }}</p>{% endif %}
+{% if in_progress %}<meta http-equiv="refresh" content="3">{% endif %}
+
+<h3>slots</h3>
+{% if refs %}
+  <table style="width:100%;border-collapse:collapse">
+    <tr style="color:#aeb6c2;font-size:.8rem">
+      <th style="text-align:left;padding:.3rem .5rem">#</th>
+      <th style="text-align:left;padding:.3rem .5rem">component</th>
+      <th style="text-align:left;padding:.3rem .5rem">instance</th>
+      <th style="text-align:left;padding:.3rem .5rem">translate x,y,z</th>
+      <th style="text-align:left;padding:.3rem .5rem">rotate x,y,z</th>
+      <th></th>
+    </tr>
+    {% for ref in refs %}
+    <tr style="border-top:1px solid #2a2d34">
+      <td style="padding:.3rem .5rem;color:#aeb6c2">{{ forloop.counter }}</td>
+      <td style="padding:.3rem .5rem">
+        <a href="{% url 'sketches:show' ref.component.pk %}" target="_blank">
+          {{ ref.component.module_name|default:"unnamed" }} <span class="tag">#{{ ref.component.pk }}</span>
+        </a>
+      </td>
+      <td style="padding:.3rem .5rem">{{ ref.instance_name }}</td>
+      <td style="padding:.3rem .5rem;font-size:.85rem">{{ ref.translate|join:", " }}</td>
+      <td style="padding:.3rem .5rem;font-size:.85rem">{{ ref.rotate|join:", " }}</td>
+      <td style="padding:.3rem .5rem">
+        <form method="post" action="{% url 'sketches:remove_slot' assembly.pk ref.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" style="background:#5a1a1a;font-size:.75rem;padding:.2rem .5rem">remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <form method="post" action="{% url 'sketches:render_assembly' assembly.pk %}" style="margin-top:1rem">
+    {% csrf_token %}
+    <button type="submit" style="background:#1a5a2a;padding:.7rem 1.4rem">
+      ▶ render assembly
+    </button>
+  </form>
+{% else %}
+  <p class="examples">no components yet — add some below.</p>
+{% endif %}
+
+<h3>add component</h3>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="add">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:.6rem">
+    <div>
+      <label style="display:block;font-size:.8rem;color:#aeb6c2;margin-bottom:.2rem">component</label>
+      <select name="component_id" style="width:100%;background:#16181d;color:#e6e8ee;border:1px solid #2a2d34;padding:.4rem;border-radius:4px;font:inherit">
+        {% for c in components %}
+          <option value="{{ c.pk }}">{{ c.module_name|default:"unnamed" }} (#{{ c.pk }})</option>
+        {% empty %}
+          <option disabled>no components available</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:.8rem;color:#aeb6c2;margin-bottom:.2rem">instance name (optional)</label>
+      <input type="text" name="instance_name" placeholder="e.g. bench_left" style="width:100%;background:#16181d;color:#e6e8ee;border:1px solid #2a2d34;padding:.4rem;border-radius:4px;font:inherit">
+    </div>
+    <div>
+      <label style="display:block;font-size:.8rem;color:#aeb6c2;margin-bottom:.2rem">translate x,y,z (mm)</label>
+      <input type="text" name="translate" value="0,0,0" style="width:100%;background:#16181d;color:#e6e8ee;border:1px solid #2a2d34;padding:.4rem;border-radius:4px;font:inherit">
+    </div>
+    <div>
+      <label style="display:block;font-size:.8rem;color:#aeb6c2;margin-bottom:.2rem">rotate x,y,z (deg)</label>
+      <input type="text" name="rotate" value="0,0,0" style="width:100%;background:#16181d;color:#e6e8ee;border:1px solid #2a2d34;padding:.4rem;border-radius:4px;font:inherit">
+    </div>
+    <div style="grid-column:span 2">
+      <label style="display:block;font-size:.8rem;color:#aeb6c2;margin-bottom:.2rem">param overrides (JSON, optional)</label>
+      <input type="text" name="params" value="{}" placeholder="{&quot;height&quot;: 1200}" style="width:100%;background:#16181d;color:#e6e8ee;border:1px solid #2a2d34;padding:.4rem;border-radius:4px;font:inherit">
+    </div>
+  </div>
+  {% if components %}
+    <button type="submit">+ add slot</button>
+  {% else %}
+    <p class="examples">generate components first at <a href="{% url 'sketches:compose' %}">compose →</a></p>
+  {% endif %}
+</form>
+
+{% if assembly.stage_log %}
+  <h3>log</h3>
+  <pre>{{ assembly.stage_log }}</pre>
+{% endif %}
+{% endblock %}

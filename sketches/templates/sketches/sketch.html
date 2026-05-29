@@ -1,0 +1,144 @@
+{% extends "sketches/_layout.html" %}
+{% block title %}sketch #{{ sketch.pk }}{% endblock %}
+{% block body %}
+  {% if in_progress %}<meta http-equiv="refresh" content="2">{% endif %}
+  <p><a href="{% url 'sketches:compose' %}">← new</a></p>
+  <h2>sketch #{{ sketch.pk }}
+    <span class="tag">{{ sketch.generator }}</span>
+    <span class="tag">{{ sketch.status }}</span>
+    {% if sketch.category %}<span class="tag tag--element">⬡ {{ sketch.category }}</span>{% endif %}
+    {% if sketch.kind == "assembly" %}<span class="tag tag--assembly">⊞ assembly</span>{% endif %}
+  </h2>
+  <p><em>{{ sketch.prompt }}</em></p>
+
+  {% if sketch.request_json.bridge_type or sketch.request_json.span_mm or sketch.request_json.notes %}
+    <h3>structured request</h3>
+    <pre>bridge_type: {{ sketch.request_json.bridge_type|default:"auto" }}
+span_mm: {{ sketch.request_json.span_mm|default:"—" }}
+deck_width_mm: {{ sketch.request_json.deck_width_mm|default:"—" }}
+clearance_mm: {{ sketch.request_json.clearance_mm|default:"—" }}
+max_height_mm: {{ sketch.request_json.max_height_mm|default:"—" }}
+lane_count: {{ sketch.request_json.lane_count|default:"—" }}
+material: {{ sketch.request_json.material|default:"auto" }}
+features: {% if sketch.request_json.features %}{{ sketch.request_json.features|join:", " }}{% else %}—{% endif %}
+notes: {{ sketch.request_json.notes|default:"—" }}
+exports: {% if sketch.export_formats %}{{ sketch.export_formats|join:", " }}{% else %}png, stl{% endif %}</pre>
+  {% endif %}
+
+  {% if in_progress %}
+    <p class="examples">working… page refreshes every 2 s. you'll see a fast preview first, then the full render, then the STL link.</p>
+  {% else %}
+    <p class="examples">rendered with OpenSCAD; download the STL for slicing or CAD review.</p>
+  {% endif %}
+
+  {% if sketch.preview %}
+    <img class="preview" src="{{ sketch.preview.url }}?v={{ sketch.status }}" alt="render">
+  {% elif in_progress %}
+    <div class="preview" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:#7ec3ff;">
+      rendering preview…
+    </div>
+  {% endif %}
+
+  {% if sketch.mesh %}
+    <p><a href="{{ sketch.mesh.url }}" download>download .stl</a></p>
+  {% elif sketch.status == "rendering" or sketch.status == "generating" or sketch.status == "planning" %}
+    <p class="examples">STL export in progress…</p>
+  {% endif %}
+
+  {% if sketch.scad_source and not in_progress %}
+    <h3>revise this design</h3>
+    <p class="examples">type a change — e.g. “add a sail”, “make the deck wider”, “thicken the ribs”. the model keeps context from prior revisions.</p>
+    <form method="post" action="{% url 'sketches:revise' sketch.pk %}">
+      {% csrf_token %}
+      <textarea name="change" rows="3" style="width:100%;" placeholder="what should change?" required></textarea>
+      <p><button type="submit">apply revision</button></p>
+    </form>
+  {% endif %}
+
+  {% if sketch.stage_log %}
+    <h3>progress</h3>
+    <pre>{{ sketch.stage_log }}</pre>
+  {% endif %}
+
+  {% if sketch.brief %}
+    <h3>engineering brief (phase 1){% if sketch.status == "planning" %} — streaming…{% endif %}</h3>
+    <pre>{{ sketch.brief }}{% if sketch.status == "planning" %}<span class="caret">▍</span>{% endif %}</pre>
+  {% endif %}
+
+  {% if sketch.module_name or sketch.interface_json.anchors %}
+    <h3>component contract</h3>
+    <pre>module: {{ sketch.module_name|default:"—" }}({% for p in sketch.interface_json.params %}{{ p.name }}{% if p.default %}={{ p.default }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %})
+anchors:{% for a in sketch.interface_json.anchors %}
+  {{ a.name }} = [{{ a.xyz.0 }}, {{ a.xyz.1 }}, {{ a.xyz.2 }}]{% empty %} — none declared{% endfor %}{% if sketch.interface_json.warnings %}
+
+warnings:{% for w in sketch.interface_json.warnings %}
+  • {{ w }}{% endfor %}{% endif %}</pre>
+  {% endif %}
+
+  {% if sketch.error %}
+    <h3>error</h3>
+    <pre class="err">{{ sketch.error }}</pre>
+  {% endif %}
+
+  {# ── Validation report ───────────────────────────────────────────────────── #}
+  {% with vr=sketch.validation %}
+  {% if vr %}
+  <h3>standards validation
+    {% if vr.status_label == "pass" %}<span class="tag tag--pass">✓ pass</span>
+    {% elif vr.status_label == "warn" %}<span class="tag tag--warn">⚠ warn</span>
+    {% else %}<span class="tag tag--fail">✗ fail</span>{% endif %}
+    <span class="tag">{{ vr.compliance_score|floatformat:0 }}% compliant</span>
+    <span class="tag tag--element">⬡ {{ vr.element_type }}</span>
+  </h3>
+  <div class="val-summary">
+    <span class="val-stat val-pass">✓ {{ vr.passed }} passed</span>
+    <span class="val-stat val-warn">⚠ {{ vr.warned }} warned</span>
+    <span class="val-stat val-fail">✗ {{ vr.failed }} failed</span>
+    <span class="val-stat val-skip">— {{ vr.skipped }} skipped</span>
+  </div>
+
+  <details class="val-details" {% if vr.failed %}open{% endif %}>
+    <summary>rule checks ({{ vr.results_json|length }})</summary>
+    <table class="val-table">
+      <thead><tr><th>rule</th><th>parameter</th><th>value</th><th>result</th></tr></thead>
+      <tbody>
+      {% for r in vr.results_json %}
+        <tr class="val-row--{{ r.status }}">
+          <td class="val-ruleid">{{ r.rule_id }}</td>
+          <td>{{ r.parameter }}</td>
+          <td>{% if r.value != None %}{{ r.value|floatformat:0 }} mm{% else %}—{% endif %}</td>
+          <td>{{ r.message }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+
+  {% if vr.rag_notes %}
+  <details class="val-details">
+    <summary>standards commentary (RAG + LLM)</summary>
+    <pre class="val-rag">{{ vr.rag_notes }}</pre>
+  </details>
+  {% endif %}
+
+  {% if vr.auto_repair_prompt %}
+  <details class="val-details">
+    <summary>auto-repair prompt</summary>
+    <pre class="val-rag">{{ vr.auto_repair_prompt }}</pre>
+    {% if not in_progress %}
+    <form method="post" action="{% url 'sketches:revise' sketch.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="change" value="{{ vr.auto_repair_prompt }}">
+      <button type="submit" class="btn-repair">⟳ apply auto-repair</button>
+    </form>
+    {% endif %}
+  </details>
+  {% endif %}
+
+  {% endif %}{# vr #}
+  {% endwith %}
+  {% if sketch.scad_source %}
+    <h3>generated openscad{% if sketch.status == "generating" %} — streaming…{% endif %}</h3>
+    <pre>{{ sketch.scad_source }}{% if sketch.status == "generating" %}<span class="caret">▍</span>{% endif %}</pre>
+  {% endif %}
+{% endblock %}

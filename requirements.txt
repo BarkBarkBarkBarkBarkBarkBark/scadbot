@@ -1,0 +1,6 @@
+Django>=5.1,<5.3
+requests>=2.32
+Pillow>=10.0
+psycopg[binary]>=3.2
+beautifulsoup4>=4.12
+PyMuPDF>=1.26

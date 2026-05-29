@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>scadforge — {% block title %}compose{% endblock %}</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { font: 14px/1.45 ui-monospace, Menlo, Consolas, monospace;
+        background:#0e0f12; color:#d6d8de; max-width:1100px;
+           margin: 2rem auto; padding: 0 1rem; }
+    a { color:#7ec3ff; }
+    h1, h2 { font-weight: 600; letter-spacing: .02em; }
+      textarea, button, input, select { font: inherit; }
+    textarea { width:100%; background:#16181d; color:#e6e8ee;
+               border:1px solid #2a2d34; padding:.6rem; border-radius:6px; }
+      input, select { background:#16181d; color:#e6e8ee;
+            border:1px solid #2a2d34; padding:.5rem .6rem; border-radius:6px; }
+    button { background:#2b6cff; color:white; border:0; padding:.55rem 1rem;
+             border-radius:6px; cursor:pointer; }
+    pre { background:#16181d; padding:.8rem; border-radius:6px;
+          overflow:auto; border:1px solid #2a2d34; }
+    img.preview { max-width:100%; border:1px solid #2a2d34; border-radius:6px;
+                  background:#000; }
+    .row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .card { flex:1 1 200px; background:#16181d; padding:.6rem;
+            border:1px solid #2a2d34; border-radius:6px;
+            text-decoration:none; color:inherit; }
+    .err { color:#ff8a8a; white-space:pre-wrap; }
+    .tag { font-size:.75rem; background:#2a2d34; padding:.1rem .4rem;
+           border-radius:4px; }
+    .tag--element { background:#1a2a1a; color:#7dca7d; border:1px solid #2d4a2d; }
+    .tag--assembly { background:#1a1a2a; color:#7d9fca; border:1px solid #2d3a4a; }
+    .tag--pass { background:#1a2a1a; color:#7dca7d; }
+    .tag--warn { background:#2a2410; color:#d4b96a; }
+    .tag--fail { background:#2a1010; color:#e07070; }
+    /* validation UI */
+    .val-summary { display:flex; gap:1rem; margin:.4rem 0; flex-wrap:wrap; }
+    .val-stat { font-size:.85rem; padding:.15rem .5rem; border-radius:4px; }
+    .val-pass { background:#1a2a1a; color:#7dca7d; }
+    .val-warn { background:#2a2410; color:#d4b96a; }
+    .val-fail { background:#2a1010; color:#e07070; }
+    .val-skip { background:#1a1a1a; color:#7a7a8a; }
+    .val-details { margin:.6rem 0; border:1px solid #2a2d34; border-radius:6px; }
+    .val-details summary { padding:.4rem .7rem; cursor:pointer; color:#aeb6c2;
+                           font-size:.85rem; user-select:none; }
+    .val-details summary:hover { color:#fff; }
+    .val-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .val-table th, .val-table td { padding:.3rem .5rem; border-bottom:1px solid #1e2126; }
+    .val-table th { color:#7a7a9a; font-weight:600; }
+    .val-row--pass td:last-child { color:#7dca7d; }
+    .val-row--warn td:last-child { color:#d4b96a; }
+    .val-row--fail td:last-child { color:#e07070; }
+    .val-row--skip td { color:#444; }
+    .val-ruleid { font-family:monospace; font-size:.78rem; color:#7ec3ff; }
+    .val-rag { font-size:.82rem; white-space:pre-wrap; padding:.5rem; color:#c5cdd8; }
+    .btn-repair { margin:.4rem .5rem .5rem; background:#1a1a2a; border:1px solid #4069c8;
+                  color:#7ec3ff; padding:.3rem .8rem; border-radius:4px; cursor:pointer; }
+    .btn-repair:hover { background:#2a2a3a; }
+    code { background:#16181d; border:1px solid #2a2d34; border-radius:4px;
+          padding:.1rem .3rem; }
+    .examples { color:#aeb6c2; }
+    .topbar { position: sticky; top: 0; z-index: 50; background:#0e0f12; padding:.2rem 0 .9rem; }
+    .navline { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-top:.4rem; }
+    .navpill { display:inline-flex; align-items:center; gap:.35rem; text-decoration:none;
+               padding:.28rem .55rem; border-radius:999px; border:1px solid #2a2d34;
+               background:#16181d; color:#d6d8de; }
+    .navpill:hover { border-color:#4069c8; color:#fff; }
+    .sticky-panel { position: sticky; top: 4.7rem; z-index: 20; background:#0e0f12;
+                    padding:.7rem 0 .5rem; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:.45rem .5rem; border-bottom:1px solid #2a2d34; vertical-align:top; }
+    th { color:#aeb6c2; font-weight:600; }
+    .muted { color:#aeb6c2; }
+    @keyframes blink { to { opacity: 0; } }
+    .caret { color:#7ec3ff; animation: blink 1s steps(2) infinite; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><a href="{% url 'sketches:compose' %}">scadforge</a></h1>
+    <div class="navline">
+      <a class="navpill" href="{% url 'sketches:compose' %}">compose</a>
+      <a class="navpill" href="{% url 'sketches:library' %}">library</a>
+      <a class="navpill" href="{% url 'sketches:assemble' %}">assemble</a>
+      <a class="navpill" href="{% url 'sketches:db_explorer' %}">database explorer</a>
+    </div>
+  </div>
+  {% block body %}{% endblock %}
+</body>
+</html>
