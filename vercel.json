@@ -1,0 +1,32 @@
+{
+  "builds": [
+    {
+      "src": "forge/wsgi.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.12"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/forge/wsgi.py"
+    },
+    {
+      "src": "/renders/(.*)",
+      "dest": "/forge/wsgi.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/forge/wsgi.py"
+    }
+  ],
+  "build": {
+    "env": {
+      "DJANGO_SETTINGS_MODULE": "forge.settings"
+    }
+  },
+  "buildCommand": "bash build_files.sh"
+}

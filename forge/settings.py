@@ -1,10 +1,15 @@
 from pathlib import Path
+import os
 from urllib.parse import parse_qs, unquote, urlparse
 
 from sketches.pipeline.envload import read_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV = read_dotenv(ROOT / ".env")
+
+# Detect Vercel / serverless runtime
+_ON_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+_TMP = Path("/tmp") if _ON_VERCEL else ROOT
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -15,7 +20,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 def _database_from_env() -> dict:
-    database_url = (ENV.get("DATABASE_URL") or "").strip()
+    database_url = (ENV.get("DATABASE_URL") or os.environ.get("DATABASE_URL") or "").strip()
     if database_url:
         parsed = urlparse(database_url)
         if parsed.scheme in {"postgres", "postgresql", "pgsql"}:
@@ -46,26 +51,41 @@ def _database_from_env() -> dict:
             "OPTIONS": {"sslmode": ENV.get("POSTGRES_SSLMODE", "prefer")},
         }
 
+    # On Vercel, /var/task is read-only — use /tmp for SQLite.
+    db_path = ENV.get("DB_PATH") or ("/tmp/forge.db" if _ON_VERCEL else str(ROOT / "forge.db"))
     return {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ROOT / "forge.db",
+        "NAME": db_path,
     }
 
-SECRET_KEY = ENV.get("SECRET_KEY", "dev-only-do-not-ship-this")
-DEBUG = ENV.get("DEBUG", "1") == "1"
+SECRET_KEY = ENV.get("SECRET_KEY") or os.environ.get("SECRET_KEY") or "dev-only-do-not-ship-this"
+# Default OFF in production (Vercel sets VERCEL_ENV); default ON locally.
+DEBUG = _env_bool("DEBUG", default=not _ON_VERCEL)
 ALLOWED_HOSTS = ["*"]
 
-# Dev-friendly CSRF: trust common local origins (incl. VS Code Simple Browser).
+# Build CSRF trusted origins: always include localhost, plus any Vercel domains.
+_vercel_url = os.environ.get("VERCEL_URL") or ENV.get("VERCEL_URL") or ""
+_vercel_project_url = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL") or ""
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8765",
     "http://localhost:8765",
     "http://127.0.0.1:8000",
     "http://localhost:8000",
+    "https://*.vercel.app",
 ]
+if _vercel_url:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_vercel_url}")
+if _vercel_project_url:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_vercel_project_url}")
+# Allow override via env var (e.g. custom domain)
+for _origin in (ENV.get("EXTRA_CSRF_ORIGINS") or "").split(","):
+    if _origin.strip():
+        CSRF_TRUSTED_ORIGINS.append(_origin.strip())
+
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", False)
-SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
+CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", _ON_VERCEL)
+SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", _ON_VERCEL)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -79,6 +99,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -108,8 +129,16 @@ LANGUAGE_CODE = "en-us"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STATIC_URL = "static/"
-MEDIA_URL = "renders/"
-MEDIA_ROOT = ROOT / "renders"
+STATIC_ROOT = ROOT / "staticfiles"  # collectstatic output; served by WhiteNoise
+MEDIA_URL = "/renders/"
+MEDIA_ROOT = _TMP / "renders"   # /tmp/renders on Vercel; ROOT/renders locally
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # pipeline knobs
 SCAD_BIN = ENV.get("SCAD_BIN") or None      # auto-detected if unset
@@ -136,6 +165,6 @@ RENDER_PX = int(ENV.get("RENDER_PX", "640"))
 SCAD_MAX_CHARS = int(ENV.get("SCAD_MAX_CHARS", "24000"))
 SCAD_RENDER_TIMEOUT = int(ENV.get("SCAD_RENDER_TIMEOUT", "300"))
 BRIDGE_TEMPLATE_FIRST = ENV.get("BRIDGE_TEMPLATE_FIRST", "0") == "1"
-STANDARDS_STORAGE_DIR = Path(ENV.get("STANDARDS_STORAGE_DIR", ROOT / "standards_store"))
+STANDARDS_STORAGE_DIR = Path(ENV.get("STANDARDS_STORAGE_DIR") or str(_TMP / "standards_store"))
 STANDARDS_CHUNK_SIZE = int(ENV.get("STANDARDS_CHUNK_SIZE", "1600"))
 STANDARDS_CHUNK_OVERLAP = int(ENV.get("STANDARDS_CHUNK_OVERLAP", "200"))
