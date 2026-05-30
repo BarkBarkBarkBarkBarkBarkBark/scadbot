@@ -1,15 +1,26 @@
-"""Run the OpenSCAD CLI to produce a PNG preview and an STL mesh."""
+"""Run the OpenSCAD CLI to produce a PNG preview and an STL mesh.
+
+Remote mode: when settings.SCAD_RENDER_URL is set every render is dispatched
+to the Fly.io render service instead of a local binary.  The local binary is
+used as a fallback when the env var is absent or the remote call fails AND a
+local binary exists.
+"""
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
+import logging
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
 
 _MAC_DEFAULT = "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD"
 
@@ -32,6 +43,53 @@ class RenderOutcome:
     stl_bytes: bytes = b""
     message: str = ""
 
+
+# ── Remote render helpers ─────────────────────────────────────────────────────
+
+def _render_url() -> str:
+    return (getattr(settings, "SCAD_RENDER_URL", None) or "").rstrip("/")
+
+
+def _render_token() -> str:
+    return getattr(settings, "SCAD_RENDER_TOKEN", None) or ""
+
+
+def _remote_render(scad: str, fmt: str, px: int = 640) -> RenderOutcome:
+    """POST scad source to the Fly.io render service; return RenderOutcome."""
+    base = _render_url()
+    if not base:
+        return RenderOutcome(False, message="no SCAD_RENDER_URL configured")
+
+    qs = urllib.parse.urlencode({"format": fmt, "px": px})
+    url = f"{base}/render?{qs}"
+
+    body = urllib.parse.urlencode({"scad": scad}).encode()
+    headers: dict[str, str] = {"Content-Type": "application/x-www-form-urlencoded"}
+    token = _render_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    timeout = getattr(settings, "SCAD_RENDER_TIMEOUT", 120)
+    try:
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = resp.read()
+        logger.info("remote render ok format=%s %d bytes", fmt, len(data))
+        if fmt == "png":
+            return RenderOutcome(ok=True, png_bytes=data)
+        return RenderOutcome(ok=True, stl_bytes=data)
+    except urllib.error.HTTPError as exc:
+        err_body = exc.read().decode(errors="replace")[:500]
+        msg = f"render service HTTP {exc.code}: {err_body}"
+        logger.warning("remote render failed: %s", msg)
+        return RenderOutcome(False, message=msg)
+    except Exception as exc:  # noqa: BLE001
+        msg = f"render service unreachable: {exc}"
+        logger.warning("remote render error: %s", msg)
+        return RenderOutcome(False, message=msg)
+
+
+# ── Local binary helpers ──────────────────────────────────────────────────────
 
 def _invoke(binary: str, args: list[str]) -> tuple[int, str]:
     try:
@@ -128,12 +186,14 @@ def render_png(scad: str, basename: str, px: int | None = None) -> RenderOutcome
     err = validate_scad(scad)
     if err:
         return RenderOutcome(False, message=err)
+    px = px or settings.RENDER_PX
+    if _render_url():
+        return _remote_render(scad, "png", px)
     prep = _prepare()
     if isinstance(prep, RenderOutcome):
         return prep
     binary, work = prep
     try:
-        px = px or settings.RENDER_PX
         src = work / f"{basename}.scad"
         png = work / f"{basename}.png"
         src.write_text(scad, encoding="utf-8")
@@ -156,6 +216,8 @@ def render_stl(scad: str, basename: str) -> RenderOutcome:
     err = validate_scad(scad)
     if err:
         return RenderOutcome(False, message=err)
+    if _render_url():
+        return _remote_render(scad, "stl")
     prep = _prepare()
     if isinstance(prep, RenderOutcome):
         return prep
@@ -190,12 +252,19 @@ def render_png_file(scad_path: str, px: int | None = None) -> RenderOutcome:
     """Render a PNG from an on-disk .scad file (e.g. an assembly wrapper).
     No string-based validation — the file may legitimately use use<>.
     """
+    px = px or settings.RENDER_PX
+    if _render_url():
+        # Read file and forward source text to remote service
+        try:
+            scad = Path(scad_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            return RenderOutcome(False, message=f"cannot read scad file: {exc}")
+        return _remote_render(scad, "png", px)
     prep = _prepare()
     if isinstance(prep, RenderOutcome):
         return prep
     binary, work = prep
     try:
-        px = px or settings.RENDER_PX
         png = work / "out.png"
         rc, log = _invoke(binary, [
             "-o", str(png),
@@ -213,6 +282,12 @@ def render_png_file(scad_path: str, px: int | None = None) -> RenderOutcome:
 
 def render_stl_file(scad_path: str) -> RenderOutcome:
     """Export STL from an on-disk .scad file (e.g. an assembly wrapper)."""
+    if _render_url():
+        try:
+            scad = Path(scad_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            return RenderOutcome(False, message=f"cannot read scad file: {exc}")
+        return _remote_render(scad, "stl")
     prep = _prepare()
     if isinstance(prep, RenderOutcome):
         return prep

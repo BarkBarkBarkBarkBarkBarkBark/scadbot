@@ -4,3 +4,5 @@ __pycache__/
 forge.db
 renders/
 .env
+.vercel
+.env*

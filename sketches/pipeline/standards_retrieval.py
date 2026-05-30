@@ -12,7 +12,6 @@ from sketches.models import StandardChunk
 from sketches.pipeline.standards_ingest import StandardIngestor
 from sketches.pipeline.pgvector_store import search_similar, vector_row_count
 
-
 def retrieve_relevant_chunks(query: str, limit: int = 5) -> list[dict]:
     query = (query or "").strip()
     if not query:

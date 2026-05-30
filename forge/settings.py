@@ -164,6 +164,9 @@ GENERATION_TIMEOUT = int(ENV.get("GENERATION_TIMEOUT", "600"))
 RENDER_PX = int(ENV.get("RENDER_PX", "640"))
 SCAD_MAX_CHARS = int(ENV.get("SCAD_MAX_CHARS", "24000"))
 SCAD_RENDER_TIMEOUT = int(ENV.get("SCAD_RENDER_TIMEOUT", "300"))
+# Remote render service (Fly.io).  Set both to enable; unset to use local binary.
+SCAD_RENDER_URL   = ENV.get("SCAD_RENDER_URL") or os.environ.get("SCAD_RENDER_URL") or None
+SCAD_RENDER_TOKEN = ENV.get("SCAD_RENDER_TOKEN") or os.environ.get("SCAD_RENDER_TOKEN") or ""
 BRIDGE_TEMPLATE_FIRST = ENV.get("BRIDGE_TEMPLATE_FIRST", "0") == "1"
 STANDARDS_STORAGE_DIR = Path(ENV.get("STANDARDS_STORAGE_DIR") or str(_TMP / "standards_store"))
 STANDARDS_CHUNK_SIZE = int(ENV.get("STANDARDS_CHUNK_SIZE", "1600"))
